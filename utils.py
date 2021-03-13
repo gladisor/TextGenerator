@@ -1,5 +1,8 @@
 import gutenbergpy.textget
 import nltk
+import json
+import numpy as np
+import os
 
 class Book:
 	def __init__(self, gutenberg_id):
@@ -39,17 +42,31 @@ def generate_examples(seq_len, chunk):
 	for i in range(len(chunk) - seq_len):
 		train = chunk[i : i + seq_len]
 		label = chunk[i + seq_len]
-		examples.append([train, label])
+		train.append(label)
+		examples.append(train)
 	return examples
+
+def dictToJson(data, path):
+	with open(path, 'w') as f:
+		json.dump(data, f)
+
+def jsonToDict(path):
+	with open(path) as f:
+		data = json.load(f)
+	return data
 
 def generate_dataset(seq_len):
 	books = {
-		# 'War and Peace':(2600, 386),
+		'War and Peace':(2600, 386),
 		'Anna Karenina':(1399, 6)
 	}
 
 	vocab = set()
 	chunks = []
+
+	## Creating location to store datset
+	path = 'data/' + str(seq_len) + '-seq_len/'
+	os.makedirs(path, exist_ok=True)
 
 	## Extracting chunks from books
 	for title, (ID, start) in books.items():
@@ -72,15 +89,20 @@ def generate_dataset(seq_len):
 		chunks += book.chunks
 
 	## Hashing chunks and generating training examples
-	vocab = dict(enumerate(vocab))
-	vocab = {v:k for k, v in vocab.items()}
+	decoder = dict(enumerate(vocab))
+	encoder = {v:k for k, v in decoder.items()}
+	## Saving vocabulary
+	dictToJson(decoder, path + 'decoder.json')
+	dictToJson(encoder, path + 'encoder.json')
 
-	hash_chunk = lambda chunk: [vocab[word] for word in chunk]
+	hash_chunk = lambda chunk: [encoder[word] for word in chunk]
 
 	print('Hashing dataset')
 	chunks = list(map(hash_chunk, chunks))
 
 	print('Generating training data')
+	## Creating training examples of seq_len prediction words
+	## and one target word
 	data = list(
 		map(
 			generate_examples, 
@@ -89,25 +111,15 @@ def generate_dataset(seq_len):
 			)
 		)
 
+	## Combining all training exampes into one array
+	## Target word is the last column
+	data = sum(data, [])
+	data = np.array(data)
+	print(f'{len(data)} training examples')
+
+	np.save(path + str(seq_len) + '-seq_len.npy', data)
+
 if __name__ == '__main__':
-	import numpy as np
 
-	seq_len = 5
-	# generate_dataset(seq_len)
-
-	data = [
-		[748, 748, 748, 748, 748, 10051, 8630, 9909, 6237, 8630, 4141, 412, 2253, 4452, 7379, 7477, 4942, 12120, 9523, 3398, 12005, 6237, 10051, 2157, 14, 4225, 4410, 12805, 12389, 5685, 412, 12185, 2982, 2157, 12185, 10292, 3725, 7477, 722], 
-		[748, 748, 748, 748, 748, 4942, 7783, 12389, 8630, 4141, 6237, 8830, 6933, 6237, 2157, 8728, 12389, 2253, 6816, 412, 3802, 4220, 12389, 453, 2270, 3725, 1532, 3329, 1033, 6237, 1532, 3886, 1557, 6237, 1532, 11325, 5786, 8449, 4190, 1310, 3725, 722]
-		]
-
-	train = list(
-		map(
-			generate_examples,
-			[seq_len] * len(data),
-			data
-			)
-		)
-
-	train = sum(train, [])
-	train = np.array(train)
-	print(train)
+	seq_len = 10
+	generate_dataset(seq_len)

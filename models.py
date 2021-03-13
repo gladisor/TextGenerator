@@ -6,7 +6,7 @@ class SeqToProb(nn.Module):
 	Model which takes in a sequence of integers (tokens) and returns
 	a discrete probability distribution over the same range of integers.
 	"""
-	def __init__(self, num_probs, emb_dim, h_dim, num_lstm, seq_len):
+	def __init__(self, num_probs, emb_dim, h_dim, num_lstm, seq_len, lr):
 		super(SeqToProb, self).__init__()
 
 		self.embedding = nn.Embedding(num_probs, emb_dim)
@@ -19,6 +19,10 @@ class SeqToProb(nn.Module):
 
 		self.fc = nn.Linear(seq_len * h_dim, num_probs)
 
+		self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+		self.to(self.device)
+
+		self.opt = torch.optim.Adam(self.parameters(), lr=lr)
 
 	def forward(self, x):
 		emb = self.embedding(x)
@@ -26,23 +30,3 @@ class SeqToProb(nn.Module):
 		out = out.reshape(out.shape[0], out.shape[1] * out.shape[2])
 		out = torch.softmax(self.fc(out), dim=-1)
 		return out
-
-if __name__ == '__main__':
-
-	model = SeqToProb(
-		num_probs=10,
-		emb_dim=5,
-		h_dim=2,
-		num_lstm=1,
-		seq_len=3)
-
-	x = torch.LongTensor([
-		[1, 2, 7],
-		[3, 4, 8],
-		[9, 6, 5],
-		[4, 9, 2]
-		])
-
-	out = model(x)
-	print(x.shape, out.shape)
-	print(out)
