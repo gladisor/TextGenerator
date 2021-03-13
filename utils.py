@@ -121,5 +121,5 @@ def generate_dataset(seq_len):
 
 if __name__ == '__main__':
 
-	seq_len = 10
+	seq_len = 20
 	generate_dataset(seq_len)
