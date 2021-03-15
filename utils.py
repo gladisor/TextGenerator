@@ -3,39 +3,41 @@ import nltk
 import json
 import numpy as np
 import os
+import csv
 
 class Book:
 	def __init__(self, gutenberg_id):
 		## Get, decode, and lowercase a book fromm gutenberg
 		self.text = gutenbergpy.textget.strip_headers(
 			gutenbergpy.textget.get_text_by_id(gutenberg_id)
-			).decode('utf-8').lower()
+			).decode('utf-8')
 
-		## Remove some unwanted characters
-		self.remove_punctuation()
+	def clean(self, seq_len, min_seq=4):
+		print('--- Cleaning ---')
+		## Remove unwanted punctuation
+		remove_chars = ['-', '—', '_', '*', '“', '”', '"', '"', '(', ')']
+		for char in remove_chars:
+		    self.text = self.text.replace(char, ' ')
 
-		## Create a list of chunks from the text
-		self.chunks = nltk.blankline_tokenize(self.text)
+		## Seperate book into list of paragraphs
+		paragraphs = nltk.blankline_tokenize(self.text)
 
-	def remove_punctuation(self):
-		## These pieces of punctuation generally just take up space
-		## and dont provide much value
-		self.text = self.text.replace('-', ' ')
-		self.text = self.text.replace('—', ' ')
-		self.text = self.text.replace('_', ' ')
-		self.text = self.text.replace('*', ' ')
+		## Sepearte each paragraph into a list of sentances
+		sentances = list(map(nltk.sent_tokenize, paragraphs))
 
-	def tokenize(self):
-		self.chunks = list(map(lambda x: nltk.word_tokenize(x), self.chunks))
+		## Combine sentances into big list of all sentances
+		sentances = sum(sentances, [])
 
-	def pad_chunks(self, seq_len):
-		left_pad = ['<start_chunk>']
-		right_pad = ['<end_chunk>']
+		## Convert to lowercase
+		sentances = list(map(str.lower, sentances))
 
-		self.chunks = list(map(lambda chunk: left_pad * seq_len + chunk + right_pad, self.chunks))
+		## Split sentances up into sequences of words
+		sequences = list(map(nltk.word_tokenize, sentances))
+		self.sequences = list(filter(lambda x: len(x) > min_seq, sequences))
 
-	def build_vocab(self):
-		self.vocab = set(sum(self.chunks, []))
+		# Padding sequences to correct length
+		pad = ['<s>']
+		self.sequences = list(map(lambda x: pad * seq_len + x, self.sequences))
 
 def generate_examples(seq_len, chunk):
 	examples = []
@@ -57,69 +59,69 @@ def jsonToDict(path):
 
 def generate_dataset(seq_len):
 	books = {
-		'War and Peace':(2600, 386),
-		'Anna Karenina':(1399, 6)
+		'War and Peace':2600,
+		'Anna Karenina':1399,
+		'Various Shorts':243,
+		'What Men Live By':6157
 	}
 
-	vocab = set()
-	chunks = []
+	## List to hold all sequences
+	sequences = []
 
 	## Creating location to store datset
 	path = 'data/' + str(seq_len) + '-seq_len/'
 	os.makedirs(path, exist_ok=True)
 
-	## Extracting chunks from books
-	for title, (ID, start) in books.items():
-		print('Downloading: ' + title)
+	## Extracting sequences from books
+	for title, ID in books.items():
 		book = Book(gutenberg_id=ID)
-		del book.chunks[0:start]
 
-		print('Tokenizing: ' + title)
-		book.tokenize()
+		## Cleaning / tokenizing
+		book.clean(seq_len)
 
-		print('Padding chunks: ' + title)
-		book.pad_chunks(seq_len)
+		sequences += book.sequences
 
-		print('Building vocabulary: ' + title)
-		book.build_vocab()
+	## Saving unprocessed sequences
+	print('--- Saving sequences ---')
+	## Converting tokenized sequence into one seperated by spaces
+	rows = list(map(lambda x: ' '.join(x), sequences))
+	with open(path + 'sequences.txt', 'w') as f:
+		for row in rows:
+			f.write('%s\n' % row)
 
-		vocab = vocab.union(book.vocab)
-		print('Total vocabulary size = ' + str(len(vocab)))
-
-		chunks += book.chunks
+	## Creating vocab
+	print('--- Creating vocabulary ---')
+	vocab = set(sum(sequences, []))
 
 	## Hashing chunks and generating training examples
 	decoder = dict(enumerate(vocab))
 	encoder = {v:k for k, v in decoder.items()}
+
 	## Saving vocabulary
 	dictToJson(decoder, path + 'decoder.json')
 	dictToJson(encoder, path + 'encoder.json')
 
-	hash_chunk = lambda chunk: [encoder[word] for word in chunk]
+	## Converting sequences into training data
+	print('--- Generating training data ---')
+	hash_sequence = lambda x: [encoder[word] for word in x]
+	sequences = list(map(hash_sequence, sequences))
 
-	print('Hashing dataset')
-	chunks = list(map(hash_chunk, chunks))
-
-	print('Generating training data')
-	## Creating training examples of seq_len prediction words
-	## and one target word
+	## Creating training examples of seq_len prediction word and one target word
 	data = list(
 		map(
 			generate_examples, 
-			[seq_len] * len(chunks), 
-			chunks
+			[seq_len] * len(sequences), 
+			sequences
 			)
 		)
 
-	## Combining all training exampes into one array
-	## Target word is the last column
+	## Combining all training exampes into one array, target word is the last column
 	data = sum(data, [])
 	data = np.array(data)
 	print(f'{len(data)} training examples')
 
-	np.save(path + str(seq_len) + '-seq_len.npy', data)
+	np.save(path + 'data.npy', data)
 
 if __name__ == '__main__':
-
-	seq_len = 20
+	seq_len = 4
 	generate_dataset(seq_len)

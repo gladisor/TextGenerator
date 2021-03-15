@@ -3,18 +3,12 @@ import torch
 
 class TextData(torch.utils.data.Dataset):
 	"""docstring for TextData"""
-	def __init__(self, path, num_data=10_000):
+	def __init__(self, data):
 		super(TextData, self).__init__()
-		## Loading in sequence data
-		data = np.load(path)
-
 		## Splitting data into columns
 		data = torch.LongTensor(data)
-		idx = torch.randperm(data.shape[0])
-		data = data[idx].view(data.size())
-
-		## For debugging
-		data = data[0:num_data]
+		# idx = torch.randperm(data.shape[0])
+		# data = data[idx].view(data.size())
 
 		self.prediction_words = data[:, :-1]
 		self.target_word = data[:, -1]
