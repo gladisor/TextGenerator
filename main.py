@@ -4,7 +4,7 @@ import wandb
 from train import LanguageModel
 
 if __name__ == '__main__':
-	seq_len = 4
+	seq_len = 6
 	path = f'data/{seq_len}-seq_len/'
 
 	## Getting vocabulary
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 	lm.train(train_set, test_set, num_epochs=5)
 	run.finish()
 
-	# h_dims = [64, 256, 512]
+	# hdims = [64, 256, 512]
 	# num_rnns = [2, 3, 4]
 	# batch_sizes = [256, 512]
 

@@ -40,27 +40,30 @@ class LanguageModel:
 		pass
 
 	def generate(self, encoder, decoder, seq_len, num_words):
-		stop_words = ['.', '!', ':']
+		stop_words = ['.', '!', ':', '?']
 		seq = ['<s>'] * seq_len
+
+		generated = []
 
 		for i in range(num_words):
 			x = self.encode(encoder, seq[i:i+seq_len])
 			x = torch.LongTensor([x]).to(self.model.device)
 
 			logits = self.model(x)
-			probs = torch.softmax(logits, dim=-1)
 
-			dist = torch.distributions.Categorical(probs)
+			dist = torch.distributions.Categorical(logits=logits)
 			word = dist.sample().item()
 
 			word = decoder[str(word)]
 
 			seq.append(word)
+			generated.append(word)
 
-			print(word, end=' ')
+			# print(word, end=' ')
 			
 			if word in stop_words:
 				break
+		return ' '.join(generated)
 
 	def train(self, train, test, num_epochs):
 
@@ -139,18 +142,3 @@ class LanguageModel:
 
 		## Save model parameters at the end
 		dictToJson(self.params, 'model_params.json')
-
-if __name__ == '__main__':
-	seq_len = 4 
-	path = f'data/{seq_len}-seq_len/'
-
-	## Getting vocabulary
-	encoder = jsonToDict(path + 'encoder.json')
-	decoder = jsonToDict(path + 'decoder.json')
-
-	params = jsonToDict(path + 'model_params.json')
-
-	lm = LanguageModel(params)
-	lm.model.load_state_dict(torch.load(path + 'model4.pt'))
-
-	lm.generate(encoder, decoder, seq_len=seq_len, num_words=50)

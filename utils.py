@@ -123,5 +123,5 @@ def generate_dataset(seq_len):
 	np.save(path + 'data.npy', data)
 
 if __name__ == '__main__':
-	seq_len = 4
+	seq_len = 6
 	generate_dataset(seq_len)
