@@ -5,6 +5,8 @@ from collections import Counter
 import os
 from pathlib import Path
 import random
+import itertools
+
 import torch
 
 def dictToJson(dictionary, path):
@@ -18,6 +20,18 @@ def jsonToDict(path):
 		dictionary = json.load(f)
 	return dictionary
 
+def text_to_sequences(text):
+	## Tokenizing string based on blankline (paragraphs)
+	sequences = nltk.blankline_tokenize(text)
+
+	## If we want sentance level data uncomment:
+	# sequences = list(map(nltk.sent_tokenize, sequences))
+	# sequences = sum(sequences, [])
+
+	## Tokenizing each item in sequence into words & punctuation
+	sequences = list(map(nltk.wordpunct_tokenize, sequences))
+	return sequences
+
 def write_sequences(list_of_strings, path):
 	with open(path, 'w', encoding='utf8') as f:
 		for line in list_of_strings:
@@ -26,14 +40,39 @@ def write_sequences(list_of_strings, path):
 def read_sequences(path):
 	## Reading file to string
 	with open(path, 'r', encoding='utf8') as f:
-		sequences = f.read()
+		text = f.read()
 
-	## Tokenizing string based on blankline
-	sequences = nltk.blankline_tokenize(sequences)
-
-	## Tokenizing each item in sequence into words & punctuation
-	sequences = list(map(nltk.word_tokenize, sequences))
+	sequences = text_to_sequences(text)
 	return sequences
+
+def pad_sequences(num_predict_words, sequences):
+	## Apply padding to each sequence on both ends
+
+	start = ['<sos>'] * num_predict_words
+	end = ['<eos>']
+	pad = lambda x: start + x + end
+
+	sequences = list(map(pad, sequences))
+	return sequences
+
+def encode_sequences(encoder, sequences):
+	## Turns sequences containing words into sequences of integers
+	return list(map(lambda seq: [encoder[word] for word in seq], sequences))
+
+def decode_sequences(decoder, sequences):
+	return list(map(lambda seq: [decoder[str(num)] for num in seq], sequences))
+
+def chunk_sequence(num_predict_words, seq):
+	examples = []
+	for i in range(len(seq) - num_predict_words):
+		examples.append(seq[i : i + num_predict_words + 1])
+	return examples
+
+def generate_examples(num_predict_words, sequences):
+	data = []
+	for seq in sequences:
+		data += chunk_sequence(num_predict_words, seq)
+	return data
 
 class Book:
 	def __init__(self, gutenberg_id):
@@ -42,17 +81,21 @@ class Book:
 			gutenbergpy.textget.get_text_by_id(gutenberg_id)
 			).decode('utf-8').lower()
 
-	def clean(self, min_seq=4):
+	def clean(self, min_seq_len=4):
 		## Remove unwanted punctuation
 		## ['“', '”', '"', '"', '(', ')'] <-- keep for later
-		remove_chars = ['-', '—', '_', '*', '“', '”', '"', '"']
+		remove_chars = ['-', '—', '_', '*', '“', '”', '"', '"', '‘', '’', '\'']
 		for char in remove_chars:
 		    self.text = self.text.replace(char, ' ')
 
-		## Seperate book into list of paragraphs
-		self.sequences = nltk.blankline_tokenize(self.text)
+		## Generate sequences from text
+		self.sequences = text_to_sequences(self.text)
 
-def extract_raw_data(ids, data_folder, sequences_folder, min_seq_len=4, validation_split=0.05):
+		## Remove sequences < min_seq_len
+		self.sequences = list(filter(lambda x: len(x) > min_seq_len, self.sequences))
+
+
+def extract_raw_data(ids):
 	## List to hold all sequences
 	sequences = []
 
@@ -64,52 +107,86 @@ def extract_raw_data(ids, data_folder, sequences_folder, min_seq_len=4, validati
 		book.clean()
 		sequences += book.sequences
 
-	## Creating vocabulary
-	sequences = list(map(nltk.word_tokenize, sequences))
-	sequences = list(filter(lambda x: len(x) > min_seq_len, sequences))
+	return sequences
 
+def build_vocabulary(sequences, special_tokens=['<sos>', '<eos>']):
+	## Creating vocabulary
 	vocab = Counter()
 	for seq in sequences:
 		vocab.update(seq)
 
+	## Adding start and end of sequence tokens
+	vocab.update(special_tokens)
+
 	## Saving reversable vocabulary
 	decoder = dict(enumerate(vocab.keys()))
 	encoder = {v:k for k, v in decoder.items()}
-	dictToJson(decoder, data_folder / 'decoder.json')
-	dictToJson(encoder, data_folder / 'encoder.json')
+
+	return (decoder, encoder)
+
+def save_data(path, sequences, vocab, split={'test':0.10, 'valid':0.05}):
+	## Creating location to store datset
+	os.makedirs(path, exist_ok=True)
 
 	## Reserving sequences for validation
 	random.shuffle(sequences)
-	split = int(len(sequences) * validation_split)
-	valid = sequences[0:split]
-	train = sequences[split:len(sequences)]
+	valid_split = int(len(sequences) * split['valid'])
+	test_split = int(len(sequences) * split['test'])
+	mid = valid_split + test_split
 
-	## Creating location to store datset
-	path = data_folder / sequences_folder
-	os.makedirs(path, exist_ok=True)
+	valid = sequences[0 : valid_split]
+	test = sequences[valid_split : mid]
+	train = sequences[mid : len(sequences)]
 
-	## Writing training sequences
-	write_sequences(train, path / 'train_sequences.txt')
+	## Validation
+	write_sequences(valid, path / 'valid.txt')
+	## Testing
+	write_sequences(test, path / 'test.txt')
+	## Training
+	write_sequences(train, path / 'train.txt')
 
-	## Writing testing sequences with a blank line in between
-	write_sequences(valid, path / 'valid_sequences.txt')
+	## Saving vocab
+	decoder, encoder = vocab
+	dictToJson(decoder, path / 'decoder.json')
+	dictToJson(encoder, path / 'encoder.json')
 
-def create_dataset(num_predict_words, name):
-	## These ids correspond to 4 of Tolstoys novels on gutenberg.org
-	ids = [2600, 1399, 243, 6157]
-	data_folder = Path('data/').resolve()
-	sequences_folder = 'sequences/'
-	path = data_folder / sequences_folder
+def sequences_pipeline(path, num_predict_words, encoder):
+	data = read_sequences(path)
+	data = pad_sequences(num_predict_words, data)
+	data = encode_sequences(encoder, data)
+	data = generate_examples(num_predict_words, data)
+	return np.array(data)
+
+def create_dataset(num_predict_words):
+	## Main file to house all data derived from the data in main/
+	data_path = Path('data/').resolve()
+	## File to keep the unprocessed data in
+	main_path = 'main/'
+	path = data_path / main_path
 
 	## If the main dataset doesnt exist: build it
 	if not os.path.exists(path):
-		extract_raw_data(ids, data_folder, sequences_folder)
+		## These ids correspond to 4 of Tolstoys novels on gutenberg.org
+		ids = [2600, 1399, 243, 6157]
+		sequences = extract_raw_data(ids)
+		## vocab is a tuple: (decoder, encoder)
+		vocab = build_vocabulary(sequences)
+		save_data(path, sequences, vocab)
 
-	## Getting train sequences
-	train = read_sequences(path / 'train_sequences.txt')
+	encoder = jsonToDict(path / 'encoder.json')
 
-	## Getting valid sequences
-	valid = read_sequences(path / 'valid_sequences.txt')
+	dataset = ['train', 'test', 'valid']
+
+	for file in dataset:
+
+
+	train, test, valid = [sequences_pipeline(path / (data + '.txt'), num_predict_words, encoder) for data in dataset]
+	print(train[0])
+	print(test[0])
+	print(valid[0])
+
+	## Creating location to store this processed data
+	os.makedirs(data_path / str(num_predict_words)-, exist_ok=False)
 
 class TextData(torch.utils.data.Dataset):
 	def __init__(self, data):
@@ -128,6 +205,9 @@ class TextData(torch.utils.data.Dataset):
 		return self.prediction_words[idx], self.target_word[idx]
 
 if __name__ == '__main__':
-	create_dataset(
-		num_predict_words=4,
-		name='4_predict_words')
+	import time
+
+	start = time.time()
+	create_dataset(num_predict_words=4)
+
+	print(time.time() - start)
