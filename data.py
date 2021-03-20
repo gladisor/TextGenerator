@@ -5,7 +5,7 @@ from collections import Counter
 import os
 from pathlib import Path
 import random
-import itertools
+import numpy as np
 
 import torch
 
@@ -155,6 +155,7 @@ def sequences_pipeline(path, num_predict_words, encoder):
 	data = pad_sequences(num_predict_words, data)
 	data = encode_sequences(encoder, data)
 	data = generate_examples(num_predict_words, data)
+	random.shuffle(data)
 	return np.array(data)
 
 def create_dataset(num_predict_words):
@@ -173,20 +174,16 @@ def create_dataset(num_predict_words):
 		vocab = build_vocabulary(sequences)
 		save_data(path, sequences, vocab)
 
-	encoder = jsonToDict(path / 'encoder.json')
-
-	dataset = ['train', 'test', 'valid']
-
-	for file in dataset:
-
-
-	train, test, valid = [sequences_pipeline(path / (data + '.txt'), num_predict_words, encoder) for data in dataset]
-	print(train[0])
-	print(test[0])
-	print(valid[0])
-
 	## Creating location to store this processed data
-	os.makedirs(data_path / str(num_predict_words)-, exist_ok=False)
+	os.makedirs(data_path / str(num_predict_words), exist_ok=False)
+
+	encoder = jsonToDict(path / 'encoder.json')
+	file_names = ['train', 'test', 'valid']
+
+	## Passing data through pipeline
+	for file_name in file_names:
+		data = sequences_pipeline(path / (file_name + '.txt'), num_predict_words, encoder)
+		np.save(data_path / str(num_predict_words) / (file_name + '.npy'), data)
 
 class TextData(torch.utils.data.Dataset):
 	def __init__(self, data):
@@ -203,11 +200,3 @@ class TextData(torch.utils.data.Dataset):
 
 	def __getitem__(self, idx):
 		return self.prediction_words[idx], self.target_word[idx]
-
-if __name__ == '__main__':
-	import time
-
-	start = time.time()
-	create_dataset(num_predict_words=4)
-
-	print(time.time() - start)

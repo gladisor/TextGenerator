@@ -1,4 +1,4 @@
-from utils import jsonToDict, dictToJson
+from data import jsonToDict, dictToJson
 from models import SeqToProb
 from data import TextData
 import numpy as np
@@ -36,12 +36,9 @@ class LanguageModel:
 		total_correct = (predicted_words == y).sum()
 		return total_correct/predicted_words.shape[0]
 
-	def perplexity(self, probs, y):
-		pass
-
 	def generate(self, encoder, decoder, seq_len, num_words):
-		stop_words = ['.', '!', ':', '?']
-		seq = ['<s>'] * seq_len
+		self.model.eval()
+		seq = ['<sos>'] * seq_len
 
 		generated = []
 
@@ -49,35 +46,35 @@ class LanguageModel:
 			x = self.encode(encoder, seq[i:i+seq_len])
 			x = torch.LongTensor([x]).to(self.model.device)
 
-			logits = self.model(x)
+			with torch.no_grad():
+				logits = self.model(x)
 
 			dist = torch.distributions.Categorical(logits=logits)
 			word = dist.sample().item()
 
 			word = decoder[str(word)]
 
+			if word == '<eos>':
+				break
+
 			seq.append(word)
 			generated.append(word)
 
-			# print(word, end=' ')
-			
-			if word in stop_words:
-				break
-		return ' '.join(generated)
+		return generated
 
-	def train(self, train, test, num_epochs):
+	def train(self, train, test, num_epochs, path):
 
 		## Putting data into loaders
 		train_loader = DataLoader(
-			TextData(train), 
-			batch_size=self.params['batch_size'], 
-			num_workers=1, 
+			TextData(train),
+			batch_size=self.params['batch_size'],
+			num_workers=1,
 			shuffle=True)
 
 		test_loader = DataLoader(
-			TextData(test), 
-			batch_size=self.params['batch_size'], 
-			num_workers=1, 
+			TextData(test),
+			batch_size=self.params['batch_size'],
+			num_workers=1,
 			shuffle=True)
 
 		## Begin training
@@ -116,8 +113,9 @@ class LanguageModel:
 				X, y = X.cuda(), y.cuda()
 
 				## Forward
-				logits = self.model(X)
-				loss = self.criterion(logits, y)
+				with torch.no_grad():
+					logits = self.model(X)
+					loss = self.criterion(logits, y)
 
 				## Measure stats
 				test_loss += loss.item()
@@ -138,7 +136,7 @@ class LanguageModel:
 				'test_acc':avg_test_acc})
 
 			## Save model each epoch
-			torch.save(self.model.state_dict(), f'model{epoch}.pt')
+			torch.save(self.model.state_dict(), path / f'model{epoch}.pt')
 
 		## Save model parameters at the end
-		dictToJson(self.params, 'model_params.json')
+		dictToJson(self.params, path / 'model_params.json')
