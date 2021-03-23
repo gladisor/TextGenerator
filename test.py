@@ -20,7 +20,7 @@ if __name__ == '__main__':
 	decoder = jsonToDict(main_path / 'decoder.json')
 
 	## Geting validation data
-	valid = read_sequences(main_path / 'test.txt')
+	valid = read_sequences(main_path / 'valid.txt')
 
 	## Loss for perplexity calculation
 	CE = nn.CrossEntropyLoss()
