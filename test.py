@@ -20,17 +20,17 @@ if __name__ == '__main__':
 	decoder = jsonToDict(main_path / 'decoder.json')
 
 	## Geting validation data
-	valid = read_sequences(main_path / 'valid.txt')
+	# valid = read_sequences(main_path / 'valid.txt')
 
 	## Loss for perplexity calculation
 	CE = nn.CrossEntropyLoss()
 
-	results = pd.DataFrame({'num_predict_words':[], 'perplexity':[]})
+	# results = pd.DataFrame({'num_predict_words':[], 'perplexity':[]})
 
-	for num_predict_words in [2, 3, 4, 5, 6, 7, 8]:
+	for num_predict_words in [6]: #[2, 3, 4, 5, 6, 7, 8]:
 		## Preparing validation data
-		padded = pad_sequences(num_predict_words, valid)
-		encoded = encode_sequences(encoder, padded)
+		# padded = pad_sequences(num_predict_words, valid)
+		# encoded = encode_sequences(encoder, padded)
 
 		## Getting params for model
 		model_path = data_path / str(num_predict_words)
@@ -40,23 +40,37 @@ if __name__ == '__main__':
 		lm = LanguageModel(params)
 		lm.model.load_state_dict(torch.load(model_path / 'model4.pt'))
 
-		perplexity = 0
-		for seq in encoded:
-			data = chunk_sequence(num_predict_words, seq)
-			data = torch.LongTensor(data)
-			data = TextData(data)
+		# perplexity = 0
+		# for seq in encoded:
+		# 	data = chunk_sequence(num_predict_words, seq)
+		# 	data = torch.LongTensor(data)
+		# 	data = TextData(data)
+		#
+		# 	x, y = data[0:len(data)]
+		# 	x, y = x.to(lm.model.device), y.to(lm.model.device)
+		#
+		# 	with torch.no_grad():
+		# 		logits = lm.model(x)
+		# 		loss = CE(logits, y)
+		# 		perplexity += torch.exp(loss).item()
+		#
+		# perplexity = perplexity / len(encoded) ## <-- averageing perplexity over number of sequences
+		#
+		# results = results.append({'num_predict_words':num_predict_words, 'perplexity':perplexity}, ignore_index=True)
 
-			x, y = data[0:len(data)]
-			x, y = x.to(lm.model.device), y.to(lm.model.device)
+		text = ['well', ',', 'prince', ',', 'so', 'genoa']
+		text = ['and', 'twisting', 'the', 'ramrod', 'he', 'looked']
+		enc = torch.LongTensor([lm.encode(encoder, text)])
+		out = lm.model(enc.cuda())
+		out = torch.softmax(out, dim=-1)
+		word = torch.argmax(out, dim=-1)
 
-			with torch.no_grad():
-				logits = lm.model(x)
-				loss = CE(logits, y)
-				perplexity += torch.exp(loss).item()
+		words = ['at', 'ahead', 'gloomily']
+		for word in words:
+			idx = encoder[word]
+			print(out[0, idx])
 
-		perplexity = perplexity / len(encoded) ## <-- averageing perplexity over number of sequences
-
-		results = results.append({'num_predict_words':num_predict_words, 'perplexity':perplexity}, ignore_index=True)
+		# print(decoder[str(word.item())])
 
 		# total_num_words = 0
 		# generated_text = []
@@ -70,5 +84,5 @@ if __name__ == '__main__':
 		#
 		# write_sequences(generated_text, model_path / 'generated.txt')
 
-	print(results)
-	results.to_csv('results.csv')
+	# print(results)
+	# results.to_csv('results.csv')
