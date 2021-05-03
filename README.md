@@ -222,8 +222,8 @@ words. All runs were done with the same set of hyperparameters shown in
 Table 1. Additionally, runs are compared after training for 5 epochs
 using a Nvidia GeForce RTX 2060.
 
-![](media\media\image1.png){width="2.56in"
-height="1.92in"}![](media\media\image2.png){width="2.56in"
+![](media\image1.png){width="2.56in"
+height="1.92in"}![](media\image2.png){width="2.56in"
 height="1.92in"}
 
 Figure 1: Loss and accuracy evaluated on the test dataset after each
@@ -242,8 +242,8 @@ necessary. Their respective loss curves have not plateaued compared to
 the others. Additionally, as with all deep neural networks, more data
 will always help.
 
-![](media\media\image3.png){width="2.56in"
-height="1.92in"}![](media\media\image4.png){width="2.56in"
+![](media\image3.png){width="2.56in"
+height="1.92in"}![](media\image4.png){width="2.56in"
 height="1.92in"}
 
 Figure 2: Comparing RF scores for each number of prediction words
@@ -261,7 +261,7 @@ more polysyllable words and longer sentences. Additionally, all of the
 tests in Figure B.1 provide support that an increased context words
 trend towards Tolstoy\'s scores for each test.
 
-![](media\media\image5.png){width="2.56in" height="1.92in"}
+![](media\image5.png){width="2.56in" height="1.92in"}
 
 Figure 3: Perplexity of the LSTM-LMs on the test dataset evaluated at
 each number of context words.
@@ -338,7 +338,7 @@ All code for this project is available at:
 \[13\] Headline generation / evaluation metric:
 <https://www.aclweb.org/anthology/2020.lrec-1.222.pdf>
 
-# 
+#
 
 # Appendix A
 
@@ -437,10 +437,10 @@ sure , catiche , caused the question .
 
 # Appendix B
 
-![](media\media\image6.png){width="2.57in"
-height="1.93in"}![](media\media\image7.png){width="2.56in"
-height="1.92in"}![](media\media\image8.png){width="2.56in"
-height="1.92in"}![](media\media\image9.png){width="2.56in"
+![](media\image6.png){width="2.57in"
+height="1.93in"}![](media\image7.png){width="2.56in"
+height="1.92in"}![](media\image8.png){width="2.56in"
+height="1.92in"}![](media\image9.png){width="2.56in"
 height="1.92in"}
 
 Figure B.: RF scores for Flesch Reading Ease, Flesch-Kincaid, Linsear
