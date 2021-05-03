@@ -223,7 +223,8 @@ Table 1. Additionally, runs are compared after training for 5 epochs
 using a Nvidia GeForce RTX 2060.
 
 ![](media\image1.png){width="2.56in"
-height="1.92in"}![](media\image2.png){width="2.56in"
+height="1.92in"}
+![](media\image2.png){width="2.56in"
 height="1.92in"}
 
 Figure 1: Loss and accuracy evaluated on the test dataset after each
